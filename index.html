@@ -60,18 +60,111 @@
             height: 2px;
             margin-top: -1px;
         }
+
+        /* Virtual Joystick Styles */
+        #joystick-container {
+            position: absolute;
+            bottom: 80px;
+            right: 80px;
+            width: 120px;
+            height: 120px;
+            z-index: 100;
+        }
+
+        #joystick-base {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            position: relative;
+        }
+
+        #joystick-knob {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.8);
+            border: 2px solid rgba(255, 255, 255, 0.9);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+            transition: all 0.1s ease;
+        }
+
+        #movement-joystick {
+            position: absolute;
+            bottom: 80px;
+            left: 80px;
+            width: 120px;
+            height: 120px;
+            z-index: 100;
+        }
+
+        @media (max-width: 768px) {
+            #instructions {
+                font-size: 12px;
+                padding: 10px;
+            }
+            
+            #joystick-container,
+            #movement-joystick {
+                width: 100px;
+                height: 100px;
+                bottom: 30px;
+            }
+            
+            #joystick-container {
+                right: 30px;
+            }
+            
+            #movement-joystick {
+                left: 30px;
+            }
+            
+            #joystick-base {
+                width: 100px;
+                height: 100px;
+            }
+            
+            #joystick-knob {
+                width: 40px;
+                height: 40px;
+            }
+        }
     </style>
 </head>
 <body>
     <div id="instructions">
         <h3>🎮 3D Block World</h3>
         <p><strong>WASD</strong> - Move around</p>
-        <p><strong>Mouse</strong> - Look around</p>
+        <p><strong>Mouse/Right Joystick</strong> - Look around</p>
+        <p><strong>Left Joystick</strong> - Move (Mobile)</p>
         <p><strong>Space</strong> - Jump</p>
         <p><strong>Click</strong> - Place/Remove blocks</p>
     </div>
 
     <div id="crosshair"></div>
+
+    <!-- Virtual Joysticks -->
+    <div id="movement-joystick">
+        <div id="move-joystick-base" style="width: 120px; height: 120px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); border: 3px solid rgba(255, 255, 255, 0.3); position: relative;">
+            <div id="move-joystick-knob" style="width: 50px; height: 50px; border-radius: 50%; background: rgba(255, 255, 255, 0.8); border: 2px solid rgba(255, 255, 255, 0.9); position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); cursor: pointer; transition: all 0.1s ease;"></div>
+        </div>
+    </div>
+
+    <div id="joystick-container">
+        <div id="joystick-base">
+            <div id="joystick-knob"></div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <button id="break-button" style="position: absolute; bottom: 220px; right: 80px; width: 60px; height: 60px; border-radius: 50%; background: rgba(255, 0, 0, 0.8); border: 3px solid rgba(255, 255, 255, 0.9); color: white; font-weight: bold; font-size: 24px; cursor: pointer; z-index: 100; transition: all 0.2s ease;">⊗</button>
+    
+    <button id="place-button" style="position: absolute; bottom: 220px; left: 80px; width: 60px; height: 60px; border-radius: 50%; background: rgba(0, 200, 0, 0.8); border: 3px solid rgba(255, 255, 255, 0.9); color: white; font-weight: bold; font-size: 28px; cursor: pointer; z-index: 100; transition: all 0.2s ease;">+</button>
 
     <!-- Load Three.js from CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -85,6 +178,14 @@
         let keys = {};
         let mouse = new THREE.Vector2();
         let isPointerLocked = false;
+
+        // Joystick variables
+        let joystickActive = false;
+        let joystickCenter = { x: 0, y: 0 };
+        let joystickOffset = { x: 0, y: 0 };
+        let moveJoystickActive = false;
+        let moveJoystickCenter = { x: 0, y: 0 };
+        let moveJoystickOffset = { x: 0, y: 0 };
 
         // Initialize 3D world
         function init() {
@@ -172,6 +273,211 @@
 
             // Window resize
             window.addEventListener('resize', onWindowResize);
+
+            // Setup virtual joysticks
+            setupJoysticks();
+
+            // Setup action buttons
+            setupActionButtons();
+        }
+
+        function setupJoysticks() {
+            const lookJoystick = document.getElementById('joystick-knob');
+            const lookJoystickBase = document.getElementById('joystick-base');
+            const moveJoystick = document.getElementById('move-joystick-knob');
+            const moveJoystickBase = document.getElementById('move-joystick-base');
+
+            // Look joystick (right side)
+            lookJoystick.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                joystickActive = true;
+                const rect = lookJoystickBase.getBoundingClientRect();
+                joystickCenter.x = rect.left + rect.width / 2;
+                joystickCenter.y = rect.top + rect.height / 2;
+            });
+
+            lookJoystick.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                joystickActive = true;
+                const rect = lookJoystickBase.getBoundingClientRect();
+                joystickCenter.x = rect.left + rect.width / 2;
+                joystickCenter.y = rect.top + rect.height / 2;
+            });
+
+            // Movement joystick (left side)
+            moveJoystick.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                moveJoystickActive = true;
+                const rect = moveJoystickBase.getBoundingClientRect();
+                moveJoystickCenter.x = rect.left + rect.width / 2;
+                moveJoystickCenter.y = rect.top + rect.height / 2;
+            });
+
+            moveJoystick.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                moveJoystickActive = true;
+                const rect = moveJoystickBase.getBoundingClientRect();
+                moveJoystickCenter.x = rect.left + rect.width / 2;
+                moveJoystickCenter.y = rect.top + rect.height / 2;
+            });
+
+            // Global touch/mouse move events
+            document.addEventListener('touchmove', handleJoystickMove);
+            document.addEventListener('mousemove', handleJoystickMove);
+            
+            // Global touch/mouse end events
+            document.addEventListener('touchend', () => {
+                joystickActive = false;
+                moveJoystickActive = false;
+                resetJoysticks();
+            });
+            
+            document.addEventListener('mouseup', () => {
+                joystickActive = false;
+                moveJoystickActive = false;
+                resetJoysticks();
+            });
+        }
+
+        function handleJoystickMove(e) {
+            if (joystickActive) {
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                
+                joystickOffset.x = clientX - joystickCenter.x;
+                joystickOffset.y = clientY - joystickCenter.y;
+                
+                // Limit joystick range
+                const maxDistance = 40;
+                const distance = Math.sqrt(joystickOffset.x ** 2 + joystickOffset.y ** 2);
+                if (distance > maxDistance) {
+                    joystickOffset.x = (joystickOffset.x / distance) * maxDistance;
+                    joystickOffset.y = (joystickOffset.y / distance) * maxDistance;
+                }
+                
+                // Update joystick knob position
+                const knob = document.getElementById('joystick-knob');
+                knob.style.transform = `translate(calc(-50% + ${joystickOffset.x}px), calc(-50% + ${joystickOffset.y}px))`;
+                
+                // Apply camera rotation
+                if (!isPointerLocked) {
+                    const sensitivity = 0.01;
+                    camera.rotation.y -= joystickOffset.x * sensitivity;
+                    camera.rotation.x -= joystickOffset.y * sensitivity;
+                    camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
+                }
+            }
+
+            if (moveJoystickActive) {
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                
+                moveJoystickOffset.x = clientX - moveJoystickCenter.x;
+                moveJoystickOffset.y = clientY - moveJoystickCenter.y;
+                
+                // Limit joystick range
+                const maxDistance = 40;
+                const distance = Math.sqrt(moveJoystickOffset.x ** 2 + moveJoystickOffset.y ** 2);
+                if (distance > maxDistance) {
+                    moveJoystickOffset.x = (moveJoystickOffset.x / distance) * maxDistance;
+                    moveJoystickOffset.y = (moveJoystickOffset.y / distance) * maxDistance;
+                }
+                
+                // Update joystick knob position
+                const knob = document.getElementById('move-joystick-knob');
+                knob.style.transform = `translate(calc(-50% + ${moveJoystickOffset.x}px), calc(-50% + ${moveJoystickOffset.y}px))`;
+            }
+        }
+
+        function resetJoysticks() {
+            joystickOffset.x = 0;
+            joystickOffset.y = 0;
+            moveJoystickOffset.x = 0;
+            moveJoystickOffset.y = 0;
+            
+            document.getElementById('joystick-knob').style.transform = 'translate(-50%, -50%)';
+            document.getElementById('move-joystick-knob').style.transform = 'translate(-50%, -50%)';
+        }
+
+        // Setup action buttons
+        function setupActionButtons() {
+            const breakButton = document.getElementById('break-button');
+            const placeButton = document.getElementById('place-button');
+
+            breakButton.addEventListener('click', () => {
+                breakBlock();
+                // Visual feedback
+                breakButton.style.transform = 'scale(0.8)';
+                setTimeout(() => breakButton.style.transform = 'scale(1)', 100);
+            });
+
+            breakButton.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                breakBlock();
+                breakButton.style.transform = 'scale(0.8)';
+                setTimeout(() => breakButton.style.transform = 'scale(1)', 100);
+            });
+
+            placeButton.addEventListener('click', () => {
+                placeBlock();
+                // Visual feedback
+                placeButton.style.transform = 'scale(0.8)';
+                setTimeout(() => placeButton.style.transform = 'scale(1)', 100);
+            });
+
+            placeButton.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                placeBlock();
+                placeButton.style.transform = 'scale(0.8)';
+                setTimeout(() => placeButton.style.transform = 'scale(1)', 100);
+            });
+        }
+
+        function breakBlock() {
+            // Cast ray from center of screen
+            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+            const intersects = raycaster.intersectObjects(scene.children);
+
+            if (intersects.length > 0) {
+                for (let intersect of intersects) {
+                    const blockPos = intersect.object.position;
+                    // Don't remove ground blocks (y == 0)
+                    if (blockPos.y > 0 && intersect.object.geometry && intersect.object.geometry.type === 'BoxGeometry') {
+                        scene.remove(intersect.object);
+                        blocks = blocks.filter(b => b.mesh !== intersect.object);
+                        break;
+                    }
+                }
+            }
+        }
+
+        function placeBlock() {
+            // Cast ray from center of screen
+            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+            const intersects = raycaster.intersectObjects(scene.children);
+
+            if (intersects.length > 0) {
+                for (let intersect of intersects) {
+                    // Only place on blocks, not lights
+                    if (intersect.object.geometry && intersect.object.geometry.type === 'BoxGeometry') {
+                        const blockPos = intersect.object.position;
+                        const normal = intersect.face.normal;
+                        const newPos = blockPos.clone().add(normal);
+                        
+                        const geometry = new THREE.BoxGeometry(1, 1, 1);
+                        const material = new THREE.MeshLambertMaterial({ 
+                            color: Math.random() * 0xffffff 
+                        });
+                        const newBlock = new THREE.Mesh(geometry, material);
+                        newBlock.position.copy(newPos);
+                        newBlock.castShadow = true;
+                        newBlock.receiveShadow = true;
+                        scene.add(newBlock);
+                        blocks.push({ mesh: newBlock, x: newPos.x, y: newPos.y, z: newPos.z });
+                        break;
+                    }
+                }
+            }
         }
 
         function onKeyDown(event) {
@@ -252,6 +558,7 @@
 
             const right = new THREE.Vector3().crossVectors(direction, new THREE.Vector3(0, 1, 0));
 
+            // Keyboard movement
             if (keys['KeyW']) {
                 velocity.x += direction.x * speed;
                 velocity.z += direction.z * speed;
@@ -268,6 +575,18 @@
                 velocity.x += right.x * speed;
                 velocity.z += right.z * speed;
             }
+
+            // Joystick movement (left joystick)
+            if (moveJoystickActive) {
+                const joystickSpeed = 0.002;
+                // Forward/backward movement
+                velocity.x -= direction.x * moveJoystickOffset.y * joystickSpeed;
+                velocity.z -= direction.z * moveJoystickOffset.y * joystickSpeed;
+                // Left/right strafe
+                velocity.x += right.x * moveJoystickOffset.x * joystickSpeed;
+                velocity.z += right.z * moveJoystickOffset.x * joystickSpeed;
+            }
+
             if (keys['Space'] && player.y <= 2.1) {
                 velocity.y = jumpForce;
             }
