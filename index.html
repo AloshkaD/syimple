@@ -594,14 +594,76 @@
             // Apply gravity
             velocity.y -= 0.01;
 
+            // Save old position for collision detection
+            const oldX = player.x;
+            const oldY = player.y;
+            const oldZ = player.z;
+
             // Update player position
             player.x += velocity.x;
             player.y += velocity.y;
             player.z += velocity.z;
 
-            // Ground collision (simple)
-            if (player.y < 2) {
-                player.y = 2;
+            // Check collision with blocks
+            const playerSize = 0.4; // Player collision radius
+            const playerHeight = 1.8; // Player height
+            let collided = false;
+
+            for (let block of blocks) {
+                const bx = block.x;
+                const by = block.y;
+                const bz = block.z;
+
+                // Check if player overlaps with block (simple box collision)
+                if (player.x + playerSize > bx - 0.5 && player.x - playerSize < bx + 0.5 &&
+                    player.y + playerHeight > by - 0.5 && player.y - 0.1 < by + 0.5 &&
+                    player.z + playerSize > bz - 0.5 && player.z - playerSize < bz + 0.5) {
+                    
+                    // Collision detected - revert movement
+                    collided = true;
+
+                    // Check which axis caused the collision and revert only that
+                    const testX = oldX;
+                    const testY = player.y;
+                    const testZ = player.z;
+                    
+                    // Test if X movement caused collision
+                    if (testX + playerSize > bx - 0.5 && testX - playerSize < bx + 0.5 &&
+                        testY + playerHeight > by - 0.5 && testY - 0.1 < by + 0.5 &&
+                        testZ + playerSize > bz - 0.5 && testZ - playerSize < bz + 0.5) {
+                        // X is fine, try reverting Y or Z
+                        player.x = oldX;
+                        velocity.x = 0;
+                    }
+
+                    // Test Y separately (for ground and ceiling)
+                    const testY2 = oldY;
+                    if (player.x + playerSize > bx - 0.5 && player.x - playerSize < bx + 0.5 &&
+                        testY2 + playerHeight > by - 0.5 && testY2 - 0.1 < by + 0.5 &&
+                        player.z + playerSize > bz - 0.5 && player.z - playerSize < bz + 0.5) {
+                        player.y = oldY;
+                        velocity.y = 0;
+                        
+                        // If landing on top of block, set player on top
+                        if (velocity.y < 0 && player.y < by + 0.5) {
+                            player.y = by + 1;
+                        }
+                    }
+
+                    // Test Z
+                    const testZ2 = oldZ;
+                    if (player.x + playerSize > bx - 0.5 && player.x - playerSize < bx + 0.5 &&
+                        player.y + playerHeight > by - 0.5 && player.y - 0.1 < by + 0.5 &&
+                        testZ2 + playerSize > bz - 0.5 && testZ2 - playerSize < bz + 0.5) {
+                        player.z = oldZ;
+                        velocity.z = 0;
+                    }
+                }
+            }
+
+            // Ground collision (if not standing on a block)
+            if (player.y < 1) {
+                player.y = 1;
                 velocity.y = 0;
             }
 
